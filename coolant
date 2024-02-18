@@ -33,6 +33,18 @@ function toggleFreeze() {
   # Skip this function if --dry-run flag was provided
   if [[ $DRYRUN == "1" ]]; then return 0; fi
 
+  # Die if PID is not numeric (e.g. "null" if there is no active window)
+  if ! [[ $PID == ?(-)+([[:digit:]]) ]]; then
+    echo "PID $PID is not a valid PID."
+    exit 1
+  fi
+  
+  # Die if nonexistent PID
+  if ! ps -p $PID > /dev/null; then
+    echo "PID $PID does not exist."
+    exit 1
+  fi
+
   # Get pids of process tree
   PIDS=$(pstree -p "$PID" | grep -oP '\(\K[^\)]+')
 
@@ -66,23 +78,6 @@ function getPidByActive() {
     exit 1
   fi
   debugPrint "PID by active window: $PID"
-
-  # Die if PID is not numeric (e.g. "null" if there is no active window)
-  if ! [[ $PID == ?(-)+([[:digit:]]) ]]; then
-    echo "Cannot freeze window with invalid PID $PID."
-    exit 1
-  fi
-}
-
-function getPidByPid() {
-  debugPrint "Getting PID by PID: $1"
-  # Check if process pid exists
-  if ! ps -p "$1" &>/dev/null; then
-    echo "Process ID $1 not found"
-    exit 1
-  fi
-
-  PID=$1
 }
 
 function getPidByName() {
@@ -240,7 +235,7 @@ function main() {
   if [ "$FLAG_ACTIVE" = true ]; then
     getPidByActive
   elif [ -n "$FLAG_PID" ]; then
-    getPidByPid "$FLAG_PID"
+    PID="$FLAG_PID"
   elif [ -n "$NAME_FLAG" ]; then
     getPidByName "$NAME_FLAG"
   elif [ "$FLAG_PROP" = true ]; then
