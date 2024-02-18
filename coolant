@@ -2,7 +2,7 @@
 
 function printHelp() {
 	cat <<EOF
-Usage: hyprfreeze (-a | -p <pid> | -n <name> | -r) [options]
+Usage: $(basename "$0") (-a | -p <pid> | -n <name> | -r) [options]
 
 Utility to suspend a game process (and other programs) in Hyprland.
 
@@ -12,12 +12,13 @@ Options:
   -a, --active          toggle suspend by active window
   -p, --pid             toggle suspend by process id
   -n, --name            toggle suspend by process name/command
-  -r, --prop            toggle suspend by clicking on window (hyprprop/swayprop must be installed)
+  -r, --prop            toggle suspend by clicking on window (requires xprop 
+                        / hyprprop / swayprop)
 
   -s, --silent          don't send notification
   -t, --notif-timeout   notification timeout in milliseconds (default 5000)
   --info                show information about the process
-  --dry-run             doesn't actually suspend/resume a process, useful with --info
+  --dry-run             doesn't actually perform an action, useful with --info
   --debug               enable debug mode
 EOF
 }
@@ -40,7 +41,7 @@ function toggleFreeze() {
   # Prevent suspending itself
   local pid_of_script=$$
   if echo "$PIDS" | grep -q "$pid_of_script"; then
-    echo "You are trying to suspend the hyprfreeze process."
+    echo "You are trying to suspend the Coolant process."
     exit 1
   fi
 
@@ -161,7 +162,7 @@ function sendNotification() {
 
   local message="PID $PID"
 
-  notify-send "${title}" "${message}" -t "$NOTIF_TIMEOUT" -a Hyprfreeze
+  notify-send "${title}" "${message}" -t "$NOTIF_TIMEOUT" -a Coolant
 }
 
 function args() {
