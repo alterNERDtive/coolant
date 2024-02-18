@@ -23,6 +23,11 @@ Options:
 EOF
 }
 
+function die() {
+  echo -e "${1:-An unexpected error ocurred.}" >&2
+  exit  ${2:-1}
+}
+
 function debugPrint() {
   if [ "$DEBUG" -eq 1 ]; then
     echo "[DEBUG] $1"
@@ -33,131 +38,142 @@ function toggleFreeze() {
   # Skip this function if --dry-run flag was provided
   if [[ $DRYRUN == "1" ]]; then return 0; fi
 
+  local pid="$1"
+
   # Die if PID is not numeric (e.g. "null" if there is no active window)
-  if ! [[ $PID == ?(-)+([[:digit:]]) ]]; then
-    echo "PID $PID is not a valid PID."
-    exit 1
+  if ! [[ $pid == ?(-)+([[:digit:]]) ]]; then
+    die "PID $pid is not a valid PID." 2
   fi
   
   # Die if nonexistent PID
-  if ! ps -p $PID > /dev/null; then
-    echo "PID $PID does not exist."
-    exit 1
+  if ! ps -p $pid > /dev/null; then
+    die "PID $pid does not exist." 130
   fi
 
   # Get pids of process tree
-  PIDS=$(pstree -p "$PID" | grep -oP '\(\K[^\)]+')
+  local pids=$(pstree -p "$pid" | grep -oP '\(\K[^\)]+')
 
-  debugPrint "PIDs: $PIDS"
+  debugPrint "PIDs: $pids"
 
   # Prevent suspending itself
   local pid_of_script=$$
-  if echo "$PIDS" | grep -q "$pid_of_script"; then
+  if echo "$pids" | grep -q "$pid_of_script"; then
     echo "You are trying to suspend the Coolant process."
     exit 1
   fi
 
   # Suspend or resume processes
-  if [[ "$(ps -o state= "$PID")" == T ]]; then
+  if [[ "$(ps -o state= "$pid")" == T ]]; then
     debugPrint "Resuming processes..."
-    kill -CONT $PIDS 2>/dev/null && echo "Resumed $(ps -p "$PID" -o comm= 2>/dev/null) (PID $PID)" || exit 1
+    kill -CONT $pids 2>/dev/null && echo "Resumed $(ps -p "$pid" -o comm= 2>/dev/null) (PID $pid)" || exit 1
   else
     debugPrint "Suspending processes..."
-    kill -STOP $PIDS 2>/dev/null && echo "Suspended $(ps -p "$PID" -o comm= 2>/dev/null) (PID $PID)" || exit 1
+    kill -STOP $pids 2>/dev/null && echo "Suspended $(ps -p "$pid" -o comm= 2>/dev/null) (PID $pid)" || exit 1
   fi
 }
 
 function getPidByActive() {
-  debugPrint "Getting PID by active window..."
+  local pid
   if [[ "hyprland" == "$DESKTOP" ]]; then
-    PID=$(hyprctl activewindow -j | jq '.pid')
+    pid=$(hyprctl activewindow -j | jq '.pid')
   elif [[ "sway" == "$DESKTOP" ]]; then
-    PID=$(swaymsg -t get_tree | jq '.. | select(.type?) | select(.focused==true) | .pid')
+    pid=$(swaymsg -t get_tree | jq '.. | select(.type?) | select(.focused==true) | .pid')
   else
     echo "Detecting the active window is currently not supported on $DESKTOP."
     exit 1
   fi
-  debugPrint "PID by active window: $PID"
+  echo $pid
 }
 
 function getPidByName() {
-  debugPrint "Getting PID by name: $1"
   # Check if process name exists
   if ! pidof -x "$1" >/dev/null; then
-    echo "Process name $1 not found"
-    exit 1
+    die "Process name '$1' not found"
   fi
 
   # Get last process if there are multiple
-  PID=$(pidof "$1" | awk '{print $NF}')
-  debugPrint "PID by name: $PID"
+  echo "$(pidof "$1" | awk '{ print $NF; }')"
 }
 
 function getPidByProp() {
-  debugPrint "Getting PID by prop..."
+  local pid
+
   if [[ "hyprland" == "$DESKTOP" ]]; then
     if ! [ $(command -v hyprprop) ]; then
-      echo "You need to install 'hyprprop' to use this feature. (https://github.com/vilari-mickopf/hyprprop)"
-      exit 1
+      die "You need to install hyprprop to use this feature. (https://github.com/vilari-mickopf/hyprprop)" 127
     fi
 
-    PID=$(hyprprop | jq '.pid')
+    pid=$(hyprprop | jq '.pid')
   elif [[ "sway" == "$DESKTOP" ]]; then
     if ! [ $(command -v swayprop) ]; then
-      echo "You need to install 'swayprop' to use this feature. (https://git.alternerd.tv/alterNERDtive/swayprop)"
-      exit 1
+      die "You need to install swayprop to use this feature. (https://git.alternerd.tv/alterNERDtive/swayprop)" 127
     fi
 
-    PID=$(swayprop | jq '.pid')
+    pid=$(swayprop | jq '.pid')
   else
-    echo "Selecting the target window by mouse is currently not supported on $DESKTOP."
-    exit 1
+    die "Selecting the target window by mouse is currently not supported on $DESKTOP." 130
   fi
-  debugPrint "PID by prop: $PID"
+
+  echo "$pid"
 }
 
 function detectEnvironment() {
   if [ $(command -v loginctl) ]; then
-    local Desktop
-    eval "$(loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Desktop)"
+    local Desktop Type
+    eval "$(loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type -p Desktop)"
     DESKTOP=$Desktop
+    SESSION=$Type
   fi
 
   if [ -z "$DESKTOP" ]; then
     DESKTOP=$XDG_SESSION_DESKTOP
   fi
-
-  if [ -z "$DESKTOP" ]; then
-    debugPrint "Could not determine desktop environment via \`loginctl\`, and `$XDG_DESKTOP_SESSION` is not set. Assuming Hyprland."
-    DESKTOP="hyprland"
+  if [ -z "$SESSION" ]; then
+    SESSION=$XDG_SESSION_TYPE
   fi
 
+  if [ -z "$SESSION" ]; then
+    die "Could not determine session type via loginctl, and \$XDG_SESSION_TYPE is not set." 130
+  fi
+  if [ -z "$DESKTOP" ]; then
+    die "Could not determine desktop environment via loginctl, and \$XDG_SESSION_DESKTOP is not set." 130
+  fi
+
+  debugPrint "Session: $SESSION"
   debugPrint "Desktop: $DESKTOP"
 }
 
 function printInfo() {
+  local pid="$1"
+
+  debugPrint "Printing session info …"
+  echo -e "$(tput bold)Session:$(tput sgr0) $SESSION"
+  echo -e "$(tput bold)Desktop:$(tput sgr0) $DESKTOP"
+  echo ""
+
   debugPrint "Printing process info..."
   echo -e "$(tput bold)Process tree:$(tput sgr0)"
-  ps -p "$PID" 2>/dev/null && pstree -p "$PID"
+  ps -p "$pid" 2>/dev/null && pstree -p "$pid"
+  echo ""
 
-  echo -e "\n$(tput bold)Process threads:$(tput sgr0)"
-  ps -eLo pid,tid,comm | grep "$PID" 2>/dev/null
+  echo -e "$(tput bold)Process threads:$(tput sgr0)"
+  ps -eLo pid,tid,comm | grep "$pid" 2>/dev/null
+  echo ""
 
-  echo -e "\n$(tput bold)Process ID$(tput sgr0) = $PID \
-    \n$(tput bold)Process name$(tput sgr0) = $(ps -p "$PID" -o comm= 2>/dev/null) \
-    \n$(tput bold)Process state$(tput sgr0) = $(ps -o state= -p "$PID" 2>/dev/null)\n"
+  echo -e "$(tput bold)Process ID$(tput sgr0) = $pid"
+  echo -e "$(tput bold)Process name$(tput sgr0) = $(ps -p "$pid" -o comm= 2>/dev/null)"
+  echo -e "$(tput bold)Process state$(tput sgr0) = $(ps -o state= -p "$pid" 2>/dev/null)"
 }
 
 function sendNotification() {
+  local pid="$@"
+
   debugPrint "Sending notification..."
-  local title
-  title=$( [[ "$(ps -p "$PID" -o state=)" == T ]] &&
-    echo "Suspended $(ps -p "$PID" -o comm= 2>/dev/null)" ||
-    echo "Resumed $(ps -p "$PID" -o comm= 2>/dev/null)")
+  local title=$( [[ "$(ps -p "$pid" -o state=)" == T ]] &&
+    echo "Suspended $(ps -p "$pid" -o comm= 2>/dev/null)" ||
+    echo "Resumed $(ps -p "$pid" -o comm= 2>/dev/null)")
 
-  local message="PID $PID"
-
-  notify-send -e "${title}" "${message}" -t "$NOTIF_TIMEOUT" -a Coolant
+  notify-send -e "${title}" "PID ${pid}" -t "$NOTIF_TIMEOUT" -a Coolant
 }
 
 function args() {
@@ -230,24 +246,28 @@ function args() {
 }
 
 function main() {
+  local pid
   debugPrint "Starting main function..."
   # Get pid by a required flag
   if [ "$FLAG_ACTIVE" = true ]; then
-    getPidByActive
+    pid="$(getPidByActive)"
+    debugPrint "PID by active window: $pid"
   elif [ -n "$FLAG_PID" ]; then
-    PID="$FLAG_PID"
+    pid="$FLAG_PID"
   elif [ -n "$NAME_FLAG" ]; then
-    getPidByName "$NAME_FLAG"
+    pid="$(getPidByName "$NAME_FLAG")"
+    debugPrint "PID by name: $PID"
   elif [ "$FLAG_PROP" = true ]; then
-    getPidByProp
+    pid="$(getPidByProp)"
+    debugPrint "PID by prop: $pid"
   fi
 
   # Suspend or resume process
-  toggleFreeze
+  toggleFreeze "$pid"
 
   # Run these functions after PID is obtained
-  if [ $INFO -eq 1 ]; then printInfo; fi
-  if [ $SILENT -ne 1 ]; then sendNotification; fi
+  if [ $INFO -eq 1 ]; then printInfo "$pid"; fi
+  if [ $SILENT -ne 1 ]; then sendNotification "$pid"; fi
 
   debugPrint "End of main function."
 }
