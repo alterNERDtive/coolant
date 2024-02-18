@@ -162,7 +162,7 @@ function sendNotification() {
 
   local message="PID $PID"
 
-  notify-send "${title}" "${message}" -t "$NOTIF_TIMEOUT" -a Coolant
+  notify-send -e "${title}" "${message}" -t "$NOTIF_TIMEOUT" -a Coolant
 }
 
 function args() {
