@@ -58,9 +58,9 @@ ln -s $(pwd)/Coolant/coolant $HOME/.local/bin
 - JQ to parse json
 - pstree which is required to list child processes
 - (Optional) xprop on X11, 
-  [hyprprop](https://github.com/vilari-mickopf/hyprprop) (on Hyprland) or 
-  [swayprop](https://git.alternerd.tv/alterNERDtive/swayprop) (on Sway) to get 
-  the pid of a window by selecting it with your mouse.
+  [hyprprop](https://github.com/vilari-mickopf/hyprprop) on Hyprland or 
+  [swayprop](https://git.alternerd.tv/alterNERDtive/swayprop) on Sway to get the 
+  pid of a window by selecting it with your mouse.
 - (Optional) Systemd for detecting session type / desktop via `loginctl`.
 
 ## Usage
