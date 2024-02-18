@@ -120,7 +120,7 @@ function getPidByProp() {
 function detectEnvironment() {
   if [ $(command -v loginctl) ]; then
     local Desktop Type
-    eval "$(loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}') -p Type -p Desktop)"
+    eval "$(loginctl show-session $(loginctl | grep $(whoami) | grep seat | awk '{print $1}') -p Type -p Desktop)"
     DESKTOP=$Desktop
     SESSION=$Type
   fi
