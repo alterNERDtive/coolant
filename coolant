@@ -98,18 +98,27 @@ function getPidByName() {
 function getPidByProp() {
   local pid
 
-  if [[ "hyprland" == "$DESKTOP" ]]; then
+  if [[ "x11" == "$SESSION" ]]; then
+    if ! [ $(command -v xprop) ]; then
+      die "You need to install xprop to use this feature." 127
+    fi
+
+    pid=$(xprop | grep -i pid | awk '{ print $3 };')
+
+  elif [[ "hyprland" == "$DESKTOP" ]]; then
     if ! [ $(command -v hyprprop) ]; then
       die "You need to install hyprprop to use this feature. (https://github.com/vilari-mickopf/hyprprop)" 127
     fi
 
     pid=$(hyprprop | jq '.pid')
+
   elif [[ "sway" == "$DESKTOP" ]]; then
     if ! [ $(command -v swayprop) ]; then
       die "You need to install swayprop to use this feature. (https://git.alternerd.tv/alterNERDtive/swayprop)" 127
     fi
 
     pid=$(swayprop | jq '.pid')
+
   else
     die "Selecting the target window by mouse is currently not supported on $DESKTOP." 130
   fi
