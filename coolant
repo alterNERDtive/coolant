@@ -148,6 +148,10 @@ function detectEnvironment() {
     die "Could not determine desktop environment via loginctl, and \$XDG_SESSION_DESKTOP is not set." 130
   fi
 
+  # Enforce lowercase for consistent matching
+  SESSION="${SESSION,,}"
+  DESKTOP="${DESKTOP,,}"
+
   debugPrint "Session: $SESSION"
   debugPrint "Desktop: $DESKTOP"
 }
