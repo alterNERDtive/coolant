@@ -71,7 +71,7 @@ Add a bind in your Hyprland or Sway config to pause the current active window:
 # ~/.config/hypr/hyprland.conf
 ...
 # Toggle freeze on active window
-bind = , PAUSE, exec, hyprfreeze -a
+bind = , PAUSE, exec, coolant -a
 ```
 
 ### Available flags
