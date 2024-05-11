@@ -65,14 +65,24 @@ ln -s $(pwd)/Coolant/coolant $HOME/.local/bin
 
 ## Usage
 
-Add a bind in your Hyprland or Sway config to pause the current active window:
+Add a bind in your Hyprland
 
 ```bash
 # ~/.config/hypr/hyprland.conf
-...
+[…]
 # Toggle freeze on active window
 bind = , PAUSE, exec, coolant -a
 ```
+
+or Sway config to pause the current active window:
+
+```bash
+# ~/.config/sway/config
+[…]
+bindsym Pause exec 'coolant -a'
+```
+
+Or wherever your X11 WM/DE handles keyboard shortcuts.
 
 ### Available flags
 
